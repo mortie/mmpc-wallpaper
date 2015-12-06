@@ -1,5 +1,5 @@
 {
-	"path": "/mnt/netdisk/Pictures",
+	"path": "/path/to/pictures",
 	"change_interval": "10 seconds",
 	"registry_update_interval": "30 minutes"
 }

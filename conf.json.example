@@ -1,5 +1,6 @@
 {
 	"path": "/path/to/pictures",
 	"change_interval": "10 seconds",
-	"registry_update_interval": "30 minutes"
+	"registry_update_interval": "30 minutes",
+	"bg_changed_cmd": "feh --bg-max background.jpg"
 }

@@ -174,10 +174,13 @@ Pictures.prototype.setWallpaper = function() {
 		readStream = fs.createReadStream(picture.path);
 	}
 
-	var child = exec("feh", ["--bg-max", "-"]);
-	readStream.pipe(child.stdin);
-	child.stdout.pipe(process.stdout);
-	child.stderr.pipe(process.stderr);
+	var writeStream = fs.createWriteStream("background.jpg");
+	readStream.pipe(writeStream);
+	readStream.on("end", function() {
+		var child = require("child_process").exec(conf.bg_changed_cmd);
+		child.stdout.pipe(process.stdout);
+		child.stderr.pipe(process.stderr);
+	});
 };
 
 var pictures = new Pictures(conf.path, function() {

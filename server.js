@@ -1,5 +1,5 @@
 var fs = require("fs");
-var exec = require("child_process").spawn;
+var spawn = require("child_process").spawn;
 var imageSize = require("image-size");
 
 var conf = JSON.parse(fs.readFileSync("conf.json"));
@@ -67,24 +67,22 @@ Picture.prototype.getType = function() {
 		return "square";
 };
 Picture.prototype.scale = function(scaleFactor) {
-	var scaled = exec("convert", [
+	var scaled = spawn("convert", [
 		this.path,
 		"-resize", (scaleFactor * 100)+"%",
 		"jpeg:-"
 	]);
-	scaled.stderr.pipe(process.stderr);
 
 	return scaled.stdout;
 };
 Picture.prototype.combineWith = function(picture) {
 	var scaleFactor = this.dimensions.height / picture.dimensions.height;
 
-	var combined = exec("convert", [
+	var combined = spawn("convert", [
 		"jpeg:-",
 		this.path, "+append",
 		"jpeg:-"
 	]);
-	combined.stderr.pipe(process.stderr);
 	picture.scale(scaleFactor).pipe(combined.stdin);
 
 	return combined.stdout;

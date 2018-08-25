@@ -2,3 +2,4 @@ conf.json
 node_modules
 npm-debug.log
 background.jpg
+registry.json

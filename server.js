@@ -31,8 +31,8 @@ function thrImageSize(path, cb) {
 	}
 }
 thrImageSize.count = 0;
-thrImageSize.defaultMax = thrImageSize.max = 5;
-thrImageSize.timeout = thrImageSize.defaultTimeout = 500;
+thrImageSize.max = 5;
+thrImageSize.timeout = 500;
 thrImageSize.queue = [];
 
 function parseTimeString(str) {
@@ -125,6 +125,9 @@ Picture.prototype.scale = function(scaleFactor) {
 
 	return scaled.stdout;
 };
+Picture.prototype.asJpeg = function() {
+	return spawn("convert", [ this.path, "jpeg:-" ]).stdout;
+}
 Picture.prototype.combineWith = function(picture) {
 	var scaleFactor = this.dimensions.height / picture.dimensions.height;
 
@@ -239,15 +242,25 @@ Pictures.prototype.setWallpaper = function(cb) {
 		if (picture2) {
 			readStream = picture.combineWith(picture2);
 		} else {
-			readStream = fs.createReadStream(picture.path);
+			readStream = picture.asJpeg();
 		}
 	} else {
-		readStream = fs.createReadStream(picture.path);
+		readStream = picture.asJpeg();
 	}
 
+	var processed = spawn("convert", [
+		"jpeg:-",
+		"(", "-clone", "0", "-blur", "100x5", "-fill", "black", "-colorize", "20%", ")",
+		"(", "-clone", "0", "-resize", conf.resolution, ")",
+		"-delete", "0", "-gravity", "center", "-compose", "over", "-composite",
+		"jpeg:-"
+	]);
+
+	readStream.pipe(processed.stdin);
+
 	var writeStream = fs.createWriteStream("background.jpg");
-	readStream.pipe(writeStream);
-	readStream.on("end", function() {
+	processed.stdout.pipe(writeStream);
+	processed.stdout.on("end", function() {
 		var child = require("child_process").exec(conf.bg_changed_cmd);
 		child.stdout.pipe(process.stdout);
 		child.stderr.pipe(process.stderr);
@@ -271,9 +284,10 @@ function unserialize(file) {
 
 function startChange(pictureses, updateImmediately) {
 	let changeInterval = parseTimeString(conf.change_interval);
-	thrImageSize.max = 1;
-	thrImageSize.timeout = 1000;
 	function change() {
+		if (pictureses.length == 0)
+			throw new Error("No pictures.");
+
 		var pics;
 		do {
 			var r = Math.floor((Math.random() * pictureses.length));
@@ -282,8 +296,6 @@ function startChange(pictureses, updateImmediately) {
 
 		console.log("Changing to random pic in "+pics.dir+"...");
 		pics.setWallpaper(function() {
-			thrImageSize.max = thrImageSize.defaultMax;
-			thrImageSize.timeout = thrImageSize.defaultTimeout;
 			console.log("Changed.");
 			setTimeout(change, changeInterval);
 		});
@@ -299,18 +311,21 @@ function startChange(pictureses, updateImmediately) {
 			setTimeout(updateRegistry, registryInterval);
 		});
 		pictureses.forEach(function(p) { p.update(async); });
+
+		thrImageSize.max = 1;
+		thrImageSize.timeout = 2000;
 	};
 
-	if (updateImmediately)
+	if (updateImmediately) {
 		updateRegistry();
-	else
+	} else {
 		setTimeout(updateRegistry, registryInterval);
+		thrImageSize.max = 1;
+		thrImageSize.timeout = 2000;
+	}
 }
 
-if (fs.existsSync("registry.json")) {
-	let pictureses = unserialize("registry.json");
-	startChange(pictureses, true);
-} else {
+function coldInit() {
 	var subdirs = fs.readdirSync(conf.path).filter(function(x) { return x != "lost+found" });
 
 	var pictureses = [];
@@ -324,4 +339,14 @@ if (fs.existsSync("registry.json")) {
 		var pics = new Pictures(conf.path+"/"+subdir, async);
 		pictureses.push(pics);
 	});
+}
+
+if (fs.existsSync("registry.json")) {
+	let pictureses = unserialize("registry.json");
+	if (pictureses.length == 0)
+		coldInit();
+	else
+		startChange(pictureses, true);
+} else {
+	coldInit();
 }

@@ -81,8 +81,7 @@ function Async(n, func) {
 function Picture(path, cb) {
 	this.path = path;
 	thrImageSize(path, function(err, dimensions) {
-		if (err)
-			throw err;
+		return cb(err);
 
 		this.dimensions = dimensions;
 		this.type = this.getType();
@@ -204,7 +203,13 @@ Pictures.prototype.update = function(cb) {
 				if (stat.isDirectory())
 					return async();
 
-				var picture = new Picture(path, function() {
+				var picture = new Picture(path, function(err) {
+					if (err) {
+						console.error(err);
+						async();
+						return;
+					}
+
 					this.all.push(picture);
 
 					if (picture.type === "wide")
@@ -235,8 +240,13 @@ Pictures.prototype.setWallpaper = function(cb) {
 
 	var readStream;
 	if (picture.type === "tall") {
-		var picture2 = this.getRandom(this.tall);
-		if (picture2) {
+		var picture2;
+		for (var i = 0; i < 5; ++i) {
+			picture2 = this.getRandom(this.tall);
+			if (picture2 != picture)
+				break;
+		}
+		if (picture2 && picture2 != picture) {
 			readStream = picture.combineWith(picture2);
 		} else {
 			readStream = picture.asJpeg();
@@ -247,7 +257,7 @@ Pictures.prototype.setWallpaper = function(cb) {
 
 	var processed = spawn("convert", [
 		"jpeg:-",
-		"(", "-clone", "0", "-blur", "100x5", "-fill", "black", "-colorize", "20%", ")",
+		"(", "-clone", "0", "-size", conf.resolution, "-blur", "100x5", "-fill", "black", "-colorize", "20%", ")",
 		"(", "-clone", "0", "-resize", conf.resolution, ")",
 		"-delete", "0", "-gravity", "center", "-compose", "over", "-composite",
 		"jpeg:-"

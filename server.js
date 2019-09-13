@@ -302,10 +302,15 @@ function startChange(pictureses, updateImmediately) {
 	let registryInterval = parseTimeString(conf.registry_update_interval);
 
 	function updateRegistry() {
+		let serializeInterval = setInterval(function() {
+			serialize(pictureses, "registry.json");
+		}, 30000);
+
 		console.log("Starting to update registry.");
 		var async = Async(pictureses.length, function() {
 			serialize(pictureses, "registry.json");
 			setTimeout(updateRegistry, registryInterval);
+			clearInterval(serializeInterval);
 		});
 		pictureses.forEach(function(p) { p.update(async); });
 

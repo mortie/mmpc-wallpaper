@@ -170,57 +170,54 @@ Pictures.unserialize = function(obj) {
 	return o;
 }
 Pictures.prototype.update = function(cb) {
-	console.log("Updating picture registry...");
+	console.log("Updating picture registry for "+this.dir+"...");
 
-	var all = [];
-	var wide = [];
-	var tall = [];
-	var square = [];
+	fs.readdir(this.dir, function(err, files) {
+		if (err) throw err;
 
-	var files = fs.readdirSync(this.dir);
+		var interval = setInterval(function() {
+			console.log("Still working on "+this.dir+": "+this.all.length+"/"+files.length);
+		}.bind(this), 10000);
 
-	var interval = setInterval(function() {
-		console.log("Still working on "+this.dir+": "+all.length+"/"+files.length);
-	}.bind(this), 10000);
+		var async = Async(files.length, function() {
+			clearInterval(interval);
+			console.log("Updated "+this.dir+".");
 
-	var async = Async(files.length, function() {
-		clearInterval(interval);
-		console.log("Updated "+this.dir+".");
+			if (cb)
+				cb();
+		}.bind(this));
 
-		this.all = all;
-		this.wide = wide;
-		this.tall = tall;
-		this.square = square;
-		if (cb)
-			cb();
-	}.bind(this));
+		files.forEach(function(file) {
+			var path = this.dir+"/"+file;
 
-	files.forEach(function(file) {
-		var path = this.dir+"/"+file;
+			if (this.all.filter(function(p) { return p.path == path }).length > 0) {
+				return async();
+			}
 
-		if (file[0] === ".")
-			return async();
-
-		fs.stat(path, function(err, stat) {
-			if (err)
-				throw err;
-
-			if (stat.isDirectory())
+			if (file[0] === ".")
 				return async();
 
-			var picture = new Picture(path, function() {
-				all.push(picture);
+			fs.stat(path, function(err, stat) {
+				if (err)
+					throw err;
 
-				if (picture.type === "wide")
-					wide.push(picture);
-				else if (picture.type === "tall")
-					tall.push(picture);
-				else if (picture.type === "square")
-					square.push(picture);
+				if (stat.isDirectory())
+					return async();
 
-				async();
-			});
-		});
+				var picture = new Picture(path, function() {
+					this.all.push(picture);
+
+					if (picture.type === "wide")
+						this.wide.push(picture);
+					else if (picture.type === "tall")
+						this.tall.push(picture);
+					else if (picture.type === "square")
+						this.square.push(picture);
+
+					async();
+				}.bind(this));
+			}.bind(this));
+		}.bind(this));
 	}.bind(this));
 };
 Pictures.prototype.getRandom = function(arr) {

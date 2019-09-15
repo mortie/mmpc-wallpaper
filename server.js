@@ -1,5 +1,6 @@
 var fs = require("fs");
 var spawn = require("child_process").spawn;
+var exec = require("child_process").exec;
 var imageSize = require("image-size");
 
 var conf = JSON.parse(fs.readFileSync("conf.json"));
@@ -125,7 +126,7 @@ Picture.prototype.scale = function(scaleFactor) {
 	return scaled.stdout;
 };
 Picture.prototype.asJpeg = function() {
-	return spawn("convert", [ this.path, "jpeg:-" ]).stdout;
+	return spawn("convert", [ this.path, "-auto-orient", "jpeg:-" ]).stdout;
 }
 Picture.prototype.combineWith = function(picture) {
 	var scaleFactor = this.dimensions.height / picture.dimensions.height;
@@ -133,6 +134,7 @@ Picture.prototype.combineWith = function(picture) {
 	var combined = spawn("convert", [
 		"jpeg:-",
 		this.path, "+append",
+		"--auto-orient",
 		"jpeg:-"
 	]);
 	picture.scale(scaleFactor).pipe(combined.stdin);
@@ -255,20 +257,19 @@ Pictures.prototype.setWallpaper = function(cb) {
 		readStream = picture.asJpeg();
 	}
 
-	var processed = spawn("convert", [
-		"jpeg:-",
-		"(", "-clone", "0", "-size", conf.resolution, "-blur", "100x5", "-fill", "black", "-colorize", "20%", ")",
-		"(", "-clone", "0", "-resize", conf.resolution, ")",
-		"-delete", "0", "-gravity", "center", "-compose", "over", "-composite",
-		"jpeg:-"
-	]);
+	var process = spawn("./blurrerbox/blurrerbox", [ conf.resolution, "-", "background.jpg" ]);
 
-	readStream.pipe(processed.stdin);
+	readStream.pipe(process.stdin);
+	process.stdout.pipe(process.stdout);
+	process.stderr.pipe(process.stderr);
+	process.on("exit", function(code, sys) {
+		if (code != 0 || sys != null) {
+			console.error("Process exited ("+code+", "+sys+")");
+			cb();
+			return;
+		}
 
-	var writeStream = fs.createWriteStream("background.jpg");
-	processed.stdout.pipe(writeStream);
-	processed.stdout.on("end", function() {
-		var child = require("child_process").exec(conf.bg_changed_cmd);
+		var child = exec(conf.bg_changed_cmd, { stdio: "inherit" });
 		child.stdout.pipe(process.stdout);
 		child.stderr.pipe(process.stderr);
 		cb();
@@ -290,6 +291,12 @@ function unserialize(file) {
 }
 
 function startChange(pictureses, updateImmediately) {
+	if (fs.existsSync("background.jpg")) {
+		var child = exec(conf.bg_changed_cmd, { stdio: "inherit" });
+		child.stdout.pipe(process.stdout);
+		child.stderr.pipe(process.stderr);
+	}
+
 	let changeInterval = parseTimeString(conf.change_interval);
 	function change() {
 		if (pictureses.length == 0)

@@ -1,0 +1,3 @@
+[submodule "blurrerbox"]
+	path = blurrerbox
+	url = https://git.mort.coffee/mort/blurrerbox.git

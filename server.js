@@ -245,9 +245,10 @@ Pictures.prototype.setWallpaper = function(cb) {
 		var picture2;
 		for (var i = 0; i < 5; ++i) {
 			picture2 = this.getRandom(this.tall);
-			if (picture2 != picture)
+			if (picture2.path != picture.path)
 				break;
 		}
+
 		if (picture2 && picture2 != picture) {
 			readStream = picture.combineWith(picture2);
 		} else {
